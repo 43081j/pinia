@@ -54,10 +54,6 @@ const outputConfigs = {
     file: pkg.module,
     format: `es`,
   },
-  cjs: {
-    file: pkg.module.replace('mjs', 'cjs'),
-    format: `cjs`,
-  },
   global: {
     file: pkg.unpkg,
     format: `iife`,
@@ -75,9 +71,7 @@ const packageConfigs = packageBuilds.map((format) =>
 
 // only add the production ready if we are bundling the options
 packageBuilds.forEach((buildName) => {
-  if (buildName === 'cjs') {
-    packageConfigs.push(createProductionConfig(buildName))
-  } else if (buildName === 'global') {
+  if (buildName === 'global') {
     packageConfigs.push(createMinifiedConfig(buildName))
   }
 })
@@ -100,7 +94,6 @@ function createConfig(buildName, output, plugins = []) {
   const isProductionBuild = /\.prod\.[cm]?js$/.test(output.file)
   const isGlobalBuild = buildName === 'global'
   const isRawESMBuild = buildName === 'browser'
-  const isNodeBuild = buildName === 'cjs'
   const isBundlerESMBuild = buildName === 'browser' || buildName === 'mjs'
 
   if (isGlobalBuild) output.name = pascalcase(pkg.name)
@@ -141,8 +134,7 @@ function createConfig(buildName, output, plugins = []) {
         isBundlerESMBuild,
         // isBrowserBuild?
         isRawESMBuild,
-        isGlobalBuild,
-        isNodeBuild
+        isGlobalBuild
       ),
       ...nodePlugins,
       ...plugins,
@@ -160,11 +152,10 @@ function createReplacePlugin(
   isProduction,
   isBundlerESMBuild,
   isRawESMBuild,
-  isGlobalBuild,
-  isNodeBuild
+  isGlobalBuild
 ) {
   const __DEV__ =
-    (isBundlerESMBuild && !isRawESMBuild) || (isNodeBuild && !isProduction)
+    isBundlerESMBuild && !isRawESMBuild
       ? // preserve to be handled by bundlers
         `(process.env.NODE_ENV !== 'production')`
       : // hard coded dev/prod builds
@@ -174,7 +165,7 @@ function createReplacePlugin(
     : 'false'
 
   const __TEST__ =
-    (isBundlerESMBuild && !isRawESMBuild) || isNodeBuild
+    isBundlerESMBuild && !isRawESMBuild
       ? `(process.env.NODE_ENV === 'test')`
       : 'false'
 
@@ -192,7 +183,7 @@ function createReplacePlugin(
     __BUNDLER__: JSON.stringify(isBundlerESMBuild),
     __GLOBAL__: JSON.stringify(isGlobalBuild),
     // is targeting Node (SSR)?
-    __NODE_JS__: JSON.stringify(isNodeBuild),
+    __NODE_JS__: 'false',
   }
   // allow inline overrides like
   //__RUNTIME_COMPILE__=true yarn build
@@ -205,15 +196,6 @@ function createReplacePlugin(
   return replace({
     preventAssignment: true,
     values: replacements,
-  })
-}
-
-function createProductionConfig(format) {
-  const extension = format === 'cjs' ? 'cjs' : 'js'
-  const descriptor = format === 'cjs' ? '' : `.${format}`
-  return createConfig(format, {
-    file: `dist/${name}${descriptor}.prod.${extension}`,
-    format: outputConfigs[format].format,
   })
 }
 
